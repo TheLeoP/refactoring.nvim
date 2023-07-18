@@ -1,5 +1,21 @@
 local Region = require("refactoring.region")
 
+---@param region RefactorRegion
+---@param region_node TSNode
+---@param out table
+---@return TSNode[]
+local function collect_region_nodes(region, region_node, out)
+    for child in region_node:iter_children() do
+        local child_region = Region:from_node(child)
+        if region:contains(child_region) then
+            table.insert(out, child)
+        elseif region:partially_contains(child_region) then
+            collect_region_nodes(region, child, out)
+        end
+    end
+    return out
+end
+
 ---@param refactor Refactor
 local function selection_setup(refactor)
     local mode = vim.api.nvim_get_mode().mode
@@ -12,10 +28,16 @@ local function selection_setup(refactor)
         include_end_of_line = refactor.ts.include_end_of_line,
     })
     local region_node = region:to_ts_node(refactor.ts:get_root())
+
+    --- @type TSNode[]
+    local region_nodes = {}
+    collect_region_nodes(region, region_node, region_nodes)
+
     local scope = refactor.ts:get_scope(region_node)
 
     refactor.region = region
     refactor.region_node = region_node
+    refactor.region_nodes = region_nodes
     refactor.scope = scope
 
     if refactor.scope == nil then

@@ -32,6 +32,7 @@ local function refactor_setup(input_bufnr, config)
         ---@class Refactor
         ---@field region RefactorRegion|nil
         ---@field region_node TSNode|nil
+        ---@field region_nodes TSNode[]|nil
         ---@field identifier_node TSNode|nil
         ---@field scope TSNode|nil
         ---@field cursor_col_adjustment integer|nil

@@ -67,17 +67,39 @@ end
 ---@param refactor Refactor
 ---@return boolean, Refactor|string
 local function extract_var_setup(refactor)
-    local extract_node = refactor.region_node
+    local extract_nodes = refactor.region_nodes
 
-    if extract_node == nil then
-        return false, "Region node is nil. Something went wrong"
+    if extract_nodes == nil then
+        return false, "Region nodes is nil. Something went wrong"
     end
 
-    local extract_node_text =
-        table.concat(utils.get_node_text(extract_node), "")
+    local extract_nodes_text = table.concat(
+        vim.tbl_map(
+            ---@param node TSNode
+            ---@return string
+            function(node)
+                return vim.treesitter.get_node_text(node, refactor.bufnr)
+            end,
+            extract_nodes
+        ),
+        ""
+    )
 
-    ---@type string
-    local sexpr = extract_node:sexpr()
+    local i = 0
+    local sexpr = table.concat(
+        vim.tbl_map(
+            ---@param node TSNode
+            ---@return string
+            function(node)
+                local text = node:sexpr() .. "@capture" .. i
+                i = i + 1
+                return text
+            end,
+            extract_nodes
+        ),
+        " "
+    )
+    sexpr = "(" .. sexpr .. ")"
     local occurrences =
         Query.find_occurrences(refactor.scope, sexpr, refactor.bufnr)
 
