@@ -31,7 +31,14 @@ local function selection_setup(refactor)
 
     --- @type TSNode[]
     local region_nodes = {}
-    collect_region_nodes(region, region_node, region_nodes)
+    if region:contains(Region:from_node(region_node)) then
+        --- TODO (TheLeoP): modify 123 and 106 to only use region_nodes (and delete region_node)
+        --- or let them still use region_node (?)
+        --- Also, use this on 106 to better get the sexpr of the selected text (?)
+        table.insert(region_nodes, region_node)
+    else
+        collect_region_nodes(region, region_node, region_nodes)
+    end
 
     local scope = refactor.ts:get_scope(region_node)
 

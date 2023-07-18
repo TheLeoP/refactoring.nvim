@@ -75,8 +75,8 @@ local function extract_var_setup(refactor)
 
     local extract_nodes_text = table.concat(
         vim.tbl_map(
-            ---@param node TSNode
-            ---@return string
+        ---@param node TSNode
+        ---@return string
             function(node)
                 return vim.treesitter.get_node_text(node, refactor.bufnr)
             end,
@@ -88,8 +88,8 @@ local function extract_var_setup(refactor)
     local i = 0
     local sexpr = table.concat(
         vim.tbl_map(
-            ---@param node TSNode
-            ---@return string
+        ---@param node TSNode
+        ---@return string
             function(node)
                 local text = node:sexpr() .. "@capture" .. i
                 i = i + 1
@@ -100,21 +100,32 @@ local function extract_var_setup(refactor)
         " "
     )
     sexpr = "(" .. sexpr .. ")"
-    local occurrences =
-        Query.find_occurrences(refactor.scope, sexpr, refactor.bufnr)
 
-    --- @type TSNode[]
-    local actual_occurrences = {}
-    local texts = {}
-
-    for _, occurrence in pairs(occurrences) do
-        local text = table.concat(utils.get_node_text(occurrence), "")
-        if text == extract_node_text then
-            table.insert(actual_occurrences, occurrence)
-            table.insert(texts, text)
+    --- @type TSNode[][]
+    local occurrences = {}
+    local query = vim.treesitter.query.parse(refactor.lang, sexpr)
+    for _, match in query:iter_matches(refactor.scope, refactor.bufnr, 0, -1) do
+        --- @type string[]
+        local texts = {}
+        --- @type TSNode[]
+        local nodes = {}
+        for _, node in ipairs(match) do
+            table.insert(texts, vim.treesitter.get_node_text(node, refactor.bufnr))
+            table.insert(nodes, node)
+        end
+        local match_text = table.concat(texts, "")
+        if match_text == extract_nodes_text then
+            table.insert(occurrences, nodes)
         end
     end
-    utils.sort_in_appearance_order(actual_occurrences)
+
+
+    table.sort(occurrences,
+        function(a, b)
+            local start_row_a, start_col_a, _, _ = a[1]:range()
+            local start_row_b, start_col_b, _, _ = b[1]:range()
+            return start_row_a <= start_row_b and start_col_a < start_col_b
+        end)
 
     local var_name = get_input("119: What is the var name > ")
     if not var_name or var_name == "" then
@@ -122,11 +133,21 @@ local function extract_var_setup(refactor)
     end
 
     refactor.text_edits = {}
-    for _, occurrence in pairs(actual_occurrences) do
+    for _, occurrence in pairs(occurrences) do
+        local first = occurrence[1]
+        local last = occurrence[#occurrence]
+        local start_row, start_col, _, _ = first:range()
+        local _, _, end_row, end_col = last:range()
+
         table.insert(
             refactor.text_edits,
             lsp_utils.replace_text(
-                Region:from_node(occurrence, refactor.bufnr),
+                Region:from_values(refactor.bufnr,
+                    start_row + 1,
+                    start_col + 1,
+                    end_row + 1,
+                    end_col
+                ),
                 get_var_name(var_name, refactor)
             )
         )
@@ -136,9 +157,9 @@ local function extract_var_setup(refactor)
     local block_scopes = {}
     --- @type table<integer, true>
     local already_seen = {}
-    for _, occurrence in pairs(actual_occurrences) do
+    for _, occurrence in pairs(occurrences) do
         local block_scope =
-            refactor.ts.get_container(occurrence, refactor.ts.block_scope)
+            refactor.ts.get_container(occurrence[1], refactor.ts.block_scope)
         -- TODO: Add test for block_scope being nil
         if block_scope == nil then
             return false, "block_scope is nil! Something went wrong"
@@ -163,8 +184,8 @@ local function extract_var_setup(refactor)
     end
 
     local statements = vim.tbl_filter(
-        ---@param node TSNode
-        ---@return TSNode[]
+    ---@param node TSNode
+    ---@return TSNode[]
         function(node)
             for _, scope in pairs(block_scopes) do
                 if node:parent():id() == scope:id() then
@@ -184,9 +205,9 @@ local function extract_var_setup(refactor)
 
     ---@type TSNode|nil
     local contained = nil
-    local top_occurrence = actual_occurrences[1]
+    local top_occurrence = occurrences[1]
     for _, statement in pairs(statements) do
-        if utils.node_contains(statement, top_occurrence) then
+        if utils.node_contains(statement, top_occurrence[1]) then
             contained = statement
         end
     end
@@ -201,7 +222,7 @@ local function extract_var_setup(refactor)
         refactor.text_edits,
         lsp_utils.insert_text(
             region,
-            get_new_var_text(extract_node_text, refactor, var_name, region)
+            get_new_var_text(extract_nodes_text, refactor, var_name, region)
         )
     )
     return true, refactor

@@ -25,6 +25,13 @@ local function refactor_setup(input_bufnr, config)
         local ts = TreeSitter.get_treesitter()
 
         local filetype = vim.bo[bufnr].filetype --[[@as ft]]
+
+        local lang = vim.treesitter.language.get_lang(filetype)
+
+        if not lang then
+            return false, "There is no treesitter parser registered for this filetype"
+        end
+
         local root = ts:get_root()
         local win = vim.api.nvim_get_current_win()
         local cursor = Point:from_cursor()
@@ -48,6 +55,7 @@ local function refactor_setup(input_bufnr, config)
             code = config:get_code_generation_for(filetype),
             ts = ts,
             filetype = filetype,
+            lang = lang,
             bufnr = bufnr,
             win = win,
             root = root,
