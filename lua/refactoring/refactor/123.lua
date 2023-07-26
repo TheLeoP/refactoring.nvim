@@ -191,7 +191,7 @@ local function inline_var_setup(refactor)
             refactor.ts.get_container(definition, refactor.ts.variable_scope)
 
         if declarator_node == nil then
-            return false, "Coudn't determine declarator node"
+            return false, "Couldn't determine declarator node"
         end
     end
 
@@ -228,7 +228,7 @@ local function inline_var_normal_setup(refactor)
     local declarator_node = refactor.region_node
 
     if declarator_node == nil then
-        return false, "Coudn't determine declarator node"
+        return false, "Couldn't determine declarator node"
     end
 
     local identifiers = refactor.ts:get_local_var_names(declarator_node)
@@ -253,7 +253,7 @@ local function inline_var_normal_setup(refactor)
         determine_identifier_position(identifiers, definition)
 
     if identifier_pos == nil then
-        return false, "Cound't determine identifier position"
+        return false, "Couldn't determine identifier position"
     end
 
     local text_edits = get_inline_text_edits(
